@@ -1,0 +1,407 @@
+grammar DutchRecurringEvents
+    
+  rule sentence      
+    recurrency ( space time_or_time_range )? {
+      def evaluate
+        recurrency.recurrency_type
+      end
+    } / time_or_time_range
+  end
+    
+  rule recurrency            
+    day_or_day_range_recurrency / period_recurrency / no_recurrency !(day_part / recurring_word_abbreviation) {
+      def recurrency_type
+        no_recurrency.recurrency_type
+      end
+    }
+  end
+  
+  rule no_recurrency
+    day_or_day_range {
+      def recurrency_type
+        [ [:none] , days.flatten.uniq.sort]
+      end
+    }
+  end
+  
+  rule period_recurrency
+      
+    ( on_keyword space )? day_or_day_range space every_x_period {
+      def recurrency_type
+        return [ [:every] + every_x_period.recurring_period , day_or_day_range.days ]
+      end
+    } /
+    
+    every_x_period (space ( on_keyword space )? day_or_day_range)? {
+      def recurrency_type
+        if respond_to? :day_or_day_range
+          [ [:every] + every_x_period.recurring_period , day_or_day_range.days ]
+        else
+          [ [:every] + every_x_period.recurring_period , [] ]
+        end
+      end
+    }
+  end
+  
+  rule every_x_period
+    iterator space the_period:( multiplier:(number / number_as_string) space plural_period / period ) {
+      def recurring_period
+        if the_period.respond_to? :plural_period
+          [ the_period.multiplier.value, the_period.plural_period.value ]
+        else
+          [ 1, the_period.value ]
+        end
+      end
+    } / 
+    one_word_period_recurrency
+  end
+  
+  rule day_or_day_range_recurrency
+    ( on_keyword space )? iterator space range:( generic_day / day_or_day_range ) {      
+      def recurrency_type
+        [ [:every,1,:day], range.days]
+      end      
+    }
+  end
+  
+  rule date
+    (date_pointer space)? specific_day / indirect_day
+  end
+  
+  rule day_or_day_range
+    day_array (array_separator day_or_day_range)? {
+      def days        
+        if respond_to? :day_or_day_range
+          day_array.days + day_or_day_range.days
+        else
+          day_array.days
+        end
+      end
+    }
+  end
+  
+  rule day_range
+    start:specific_day space stop_range space stop:specific_day {
+      def days
+        
+        current   = start.day
+        the_days  = [current]
+        current   = (current + 1) % 7
+        
+        stop_day  = stop_range.inclusive? && stop.day != start.day ? stop.day + 1 : stop.day
+        
+        while current != stop_day
+          the_days << current
+          current = (current + 1) % 7
+        end
+                
+        return the_days
+        
+      end
+    }
+  end
+  
+  rule day_array
+    pre:(specific_day / day_range) array_separator day_array {
+      def days
+        pre.days + day_array.days
+      end
+    } / day_range / specific_day
+  end
+  
+  rule date_pointer
+    pointer space period
+  end
+  
+  rule time_or_time_range
+    time_array (array_separator time_or_time_range)?
+  end
+  
+  rule time_range
+    ( start_range space )? time space stop_range space time
+  end
+  
+  rule time_array
+    ( time_range / time / specific_day ) array_separator time_array / time_range / time
+  end
+  
+  rule time
+    specific_day_part / day_part /
+    time_notification ( space time_placer )? /
+    ( hour_number / number_as_string ) ( space time_quantifier )? ( space time_placer )?
+  end
+  
+  rule specific_day_part
+    specific_day ( day_part / recurring_word_abbreviation )
+  end
+  
+  rule space  
+    [ \t]+
+  end
+  
+  rule array_separator
+    space? ',' space? / space 'en' space / space 'of' space / space
+  end
+  
+  rule one_word_period_recurrency
+    number_as_string 'wekelijks' {
+      def recurring_period
+        [number_as_string.value,:week]
+      end
+    }
+  end
+  
+  rule on_keyword
+    'op'
+  end
+  
+  rule generic_day
+    'dag' {
+      def days
+        (0..6).to_a
+      end
+    }
+  end
+  
+  rule pointer
+    'volgende' / 'vorige' / 'deze'
+  end
+  
+  rule start_range
+    'van' / 'vanaf'
+  end
+  
+  rule stop_range
+    'tot' {
+      def inclusive?
+        false
+      end      
+    } / 't/m' {
+      def inclusive?
+        true
+      end
+    }
+  end
+  
+  rule iterator
+    'elke' / 'iedere'
+  end
+  
+  rule indirect_day
+    'vandaag' / 'morgen' / 'overmorgen'
+  end
+      
+  rule period
+    'week' {
+      def value
+        :week
+      end
+    } / 'maand' {
+      def value
+        :month
+      end
+    }
+  end
+  
+  rule plural_period
+    'weken' {
+      def value
+        :week
+      end
+    } / 'maanden' {
+      def value
+        :month
+      end
+    }
+  end
+  
+  rule specific_day
+    ('maandag' / 'ma' !'and' ) {
+      def day
+        1
+      end      
+      def days
+        [day]
+      end      
+    } / ('dinsdag' / 'di') {
+      def day
+        2
+      end
+      def days
+        [day]
+      end
+    }/ ('woensdag' / 'wo') {
+      def day
+        3
+      end
+      def days
+        [day]
+      end
+    } / ('donderdag' / 'do') {
+      def day
+        4
+      end
+      def days
+        [day]
+      end
+    } / ('vrijdag' / 'vr') {
+      def day
+        5
+      end
+      def days
+        [day]
+      end
+    } / ('zaterdag' / 'za') {
+      def day
+        6
+      end
+      def days
+        [day]
+      end
+    } / ('zondag' / 'zo') {
+      def day
+        0
+      end
+      def days
+        [day]
+      end
+    }
+  end
+  
+  rule day_part
+    'middag' / 'ochtend' / 'avond' / 'nacht'
+  end
+    
+  rule time_notification
+    [0-9] [0-9]? ':' [0-9] [0-9]
+  end
+  
+  rule recurring_word_abbreviation
+    '-'
+  end
+  
+  rule number
+    [0-9]+ {
+      def value
+        text_value.to_i
+      end
+    }
+  end
+  
+  rule hour_number
+    ('1' / '2' / '3' / '4' / '5' / '6' / '7' / '8' / '9' / '10' / '11' / '12' / '13' /
+    '14' / '15' / '16' / '17' / '18' / '19' / '20' / '21' / '22' / '23') {
+      def value
+        text_value.to_i
+      end
+    }
+  end
+  
+  rule number_as_string
+    'een' {
+      def value
+        1
+      end
+    } / 'twee' {
+      def value
+        2
+      end
+    }/ 'drie' {
+      def value
+        3
+      end
+    } / 'vier' {
+      def value
+        4
+      end
+    } / 'vijf' {
+      def value
+        5
+      end
+    } / 'zes' {
+      def value
+        6
+      end
+    } / 'zeven' {
+      def value
+        7
+      end
+    } / 'acht' {
+      def value
+        8
+      end
+    } / 'negen' {
+      def value
+        9
+      end
+    } / 'tien' {
+      def value
+        10
+      end
+    } / 'elf' {
+      def value
+        11
+      end
+    } / 'twaalf' {
+      def value
+        12
+      end
+    } / 'dertien' {
+      def value
+        13
+      end
+    } / 'veertien' {
+      def value
+        14
+      end
+    } / 'vijftien' {
+      def value
+        15
+      end
+    } / 'zestien' {
+      def value
+        16
+      end
+    } / 'zeventien' {
+      def value
+        17
+      end
+    } / 'achttien' {
+      def value
+        18
+      end
+    } / 'negentien' {
+      def value
+        19
+      end
+    } / 'twintig' {
+      def value
+        20
+      end
+    } / 'eenentwintig' {
+      def value
+        21
+      end
+    } / 'tweeemtwintig' {
+      def value
+        22
+      end
+    } / 
+    'drieentwintig' {
+      def value
+        23
+      end
+    }
+  end
+  
+  rule time_placer
+    '\'s middags' / '\'s ochtends' / '\'s avonds' / '\'s nachts' /
+    'pm' / 'am' / 
+    'in de middag' / 'in de ochtend' / 'in de avond' / 'in de nacht'
+  end
+  
+  rule time_quantifier
+    'uur'
+  end
+  
+end

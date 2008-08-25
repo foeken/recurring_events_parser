@@ -26,7 +26,9 @@ describe DutchRecurringEventsParser, "parsing common examples" do
           if !(parse_tree.respond_to? :evaluate)
             failures << "[FAILED EVAL] \"#{example.first}\" | Eval method missing! "
           elsif parse_tree.evaluate != example.last
-            failures << "[FAILED EVAL] \"#{example.first}\" | Expected: #{example.last.inspect} | Got: #{parse_tree.evaluate.inspect}"
+            
+            result = parse_tree.evaluate            
+            failures << "[FAILED EVAL] \"#{example.first}\" | Expected: #{example.last.inspect} | Got: #{result.inspect}"
           end
         end
         
@@ -61,19 +63,19 @@ describe DutchRecurringEventsParser, "parsing common examples" do
   
   it "should parse all examples regarding datetime ranges" do
     examples = [
-        ["maandag van 3 tot 6",                                   [ [:none],          [1]     ] ],
-        ["maandag 3 tot 6",                                       [ [:none],          [1]     ] ],
-        ["maandag 3 uur tot 6 uur",                               [ [:none],          [1]     ] ],
-        ["maandag 10:00 tot 18:00",                               [ [:none],          [1]     ] ],
-        ["maandag 1:00 tot 18:00",                                [ [:none],          [1]     ] ],
-        ["maandag van tien tot twaalf 's nachts",                 [ [:none],          [1]     ] ],
-        ["maandag van 1 uur 's nachts t/m 6 uur in de ochtend",   [ [:none],          [1]     ] ],
-        ["maandag elke week van drie tot vijf 's middags",        [ [:every,1,:week], [1]     ] ],
-        ["maandagmiddag",                                         [ [:none],          [1]     ] ],
-        ["maandag-, dinsdag- en donderdagmiddag",                 [ [:none],          [1,2,4] ] ],
-        ["maandag, dinsdag en donderdagmiddag",                   [ [:none],          [1,2,4] ] ],
-        ["maandagmiddag t/m dinsdagmiddag",                       [ [:none],          [1,2]   ] ],
-        ["maandag- t/m dinsdagmiddag",                            [ [:none],          [1,2]   ] ],
+        ["maandag van 3 tot 6",                                   [ [:none],          [1]     , [Time.parse('15:00'),Time.parse('18:00')] ] ],
+        ["maandag 3 tot 6",                                       [ [:none],          [1]     , [Time.parse('15:00'),Time.parse('18:00')] ] ],
+        ["maandag 3 uur tot 6 uur",                               [ [:none],          [1]     , [Time.parse('15:00'),Time.parse('18:00')] ] ],
+        ["maandag 10:00 tot 18:00",                               [ [:none],          [1]     , [Time.parse('10:00'),Time.parse('18:00')] ] ],
+        ["maandag 1:00 tot 18:00",                                [ [:none],          [1]     , [Time.parse('01:00'),Time.parse('18:00')] ] ],
+        ["maandag van tien tot twaalf 's nachts",                 [ [:none],          [1]     , [Time.parse('22:00'),Time.parse('00:00')] ] ],
+        ["maandag van 1 uur 's nachts t/m 6 uur in de ochtend",   [ [:none],          [1]     , [Time.parse('01:00'),Time.parse('06:00')] ] ],
+        ["maandag elke week van drie tot vijf 's middags",        [ [:every,1,:week], [1]     , [Time.parse('15:00'),Time.parse('17:00')] ] ],
+        ["maandagmiddag",                                         [ [:none],          [1]     , [Time.parse('12:00'),Time.parse('18:00')] ] ],
+        ["maandag-, dinsdag- en donderdagmiddag",                 [ [:none],          [1,2,4] , [Time.parse('12:00'),Time.parse('18:00')] ] ],
+        ["maandag, dinsdag en donderdagmiddag",                   [ [:none],          [1,2,4] , [Time.parse('12:00'),Time.parse('18:00')] ] ],
+        ["maandagmiddag t/m dinsdagmiddag",                       [ [:none],          [1,2]   , [Time.parse('12:00'),Time.parse('18:00')] ] ],
+        ["maandag- t/m dinsdagmiddag",                            [ [:none],          [1,2]   , [Time.parse('15:00'),Time.parse('18:00')] ] ],
         ]
 
      run_examples examples 

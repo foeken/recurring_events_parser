@@ -1,11 +1,17 @@
 grammar DutchRecurringEvents
     
   rule sentence      
-    recurrency ( space time_or_time_range )? {
+    recurrency time:( space time_or_time_range )? {
       def evaluate
-        recurrency.recurrency_type
+        the_sentence =  recurrency.recurrency_type
+        the_sentence += [time.time_or_time_range.times] if time.respond_to? :time_or_time_range
+        return the_sentence
       end
-    } / time_or_time_range
+    } / time_or_time_range {
+      def evaluate
+        [ [:none], [], times ]
+      end
+    }
   end
     
   rule recurrency            
@@ -32,10 +38,10 @@ grammar DutchRecurringEvents
       end
     } /
     
-    every_x_period (space ( on_keyword space )? day_or_day_range)? {
+    every_x_period days:(space ( on_keyword space )? day_or_day_range)? {
       def recurrency_type
-        if respond_to? :day_or_day_range
-          [ [:every] + every_x_period.recurring_period , day_or_day_range.days ]
+        if days.respond_to? :day_or_day_range
+          [ [:every] + every_x_period.recurring_period , days.day_or_day_range.days ]
         else
           [ [:every] + every_x_period.recurring_period , [] ]
         end
@@ -114,25 +120,75 @@ grammar DutchRecurringEvents
   end
   
   rule time_or_time_range
-    time_array (array_separator time_or_time_range)?
+    time_array (array_separator time_or_time_range)? {
+      def times
+        the_times =  time_array.times
+        the_times += [time_or_time_range.times] if respond_to? :time_or_time_range
+        return the_times
+      end
+    }
   end
   
   rule time_range
-    ( start_range space )? time space stop_range space time
+    ( start_range space )? start:time space stop_range space stop:time {
+      def times
+        [start.time,stop.time]
+      end
+    }
   end
   
   rule time_array
-    ( time_range / time / specific_day ) array_separator time_array / time_range / time
+    value1:( time_range / time / specific_day ) array_separator time_array {
+      def times
+        [value1.times] + time_array.times
+      end
+    } / time_range / time
   end
   
   rule time
     specific_day_part / day_part /
-    time_notification ( space time_placer )? /
-    ( hour_number / number_as_string ) ( space time_quantifier )? ( space time_placer )?
+    time_notification ( space time_placer )? {
+      def time
+        # TODO: time_placer should be regarded smart!
+        time_notification.time
+      end
+      def times
+        [time]
+      end
+    } /
+    number:( hour_number / number_as_string ) ( space time_quantifier )? place:( space time_placer )? {      
+      def time
+        
+        if place.respond_to? :time_placer
+          placer = place.time_placer.value
+        else
+          placer = :afternoon
+        end      
+
+        hour = number.value
+        
+        case placer
+          when :am, :morning, :night
+            hour = 0 if hour == 12             
+          when :pm, :evening, :afternoon            
+            hour += 12 if hour > 0 && hour < 12
+        end  
+        
+        Time.parse("#{hour}:00")
+      end
+      
+      def times
+        [time]
+      end      
+    }
   end
   
   rule specific_day_part
-    specific_day ( day_part / recurring_word_abbreviation )
+    specific_day part:( day_part / recurring_word_abbreviation ) {
+      def times
+        part.times
+      end
+    }
   end
   
   rule space  
@@ -269,15 +325,42 @@ grammar DutchRecurringEvents
   end
   
   rule day_part
-    'middag' / 'ochtend' / 'avond' / 'nacht'
+    'middag' {
+      def times
+        [Time.parse('12:00'),Time.parse('18:00')]
+      end
+    } / 'ochtend' {
+      def times
+        [Time.parse('06:00'),Time.parse('12:00')]
+      end
+    } / 'avond' {
+      def times
+        [Time.parse('18:00'),Time.parse('00:00')]
+      end
+    } / 'nacht' {
+      def times
+        [Time.parse('00:00'),Time.parse('06:00')]
+      end
+    }
   end
     
   rule time_notification
-    [0-9] [0-9]? ':' [0-9] [0-9]
+    [0-9] [0-9]? ':' [0-9] [0-9] {
+      def time
+        Time.parse(text_value)
+      end
+      def times
+        [time]
+      end
+    }
   end
   
   rule recurring_word_abbreviation
-    '-'
+    '-' {
+      def times
+        [nil,nil]
+      end
+    }
   end
   
   rule number
@@ -395,9 +478,31 @@ grammar DutchRecurringEvents
   end
   
   rule time_placer
-    '\'s middags' / '\'s ochtends' / '\'s avonds' / '\'s nachts' /
-    'pm' / 'am' / 
-    'in de middag' / 'in de ochtend' / 'in de avond' / 'in de nacht'
+    ('\'s middags' / 'in de middag') {
+      def value
+        :afternoon
+      end
+    } / ('\'s ochtends' / 'in de ochtend') {
+      def value
+        :morning
+      end
+    } / ('\'s avonds' / 'in de avond') {
+      def value
+        :evening
+      end
+    } / ('\'s nachts' / 'in de nacht') {
+      def value
+        :night
+      end
+    } / 'pm' {
+      def value
+        :pm
+      end
+    } / 'am' {
+      def value
+        :am
+      end
+    }
   end
   
   rule time_quantifier
